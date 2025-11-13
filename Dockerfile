@@ -21,19 +21,28 @@ RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd xml zip
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Salin semua file dari proyek ke dalam container
-COPY . /var/www/html
-
-# Set permission untuk folder storage dan cache
-RUN chown -R www-data:www-data /var/www/html \
-    && chmod -R 775 /var/www/html/storage \
-    && chmod -R 775 /var/www/html/bootstrap/cache
+# Salin file composer terlebih dahulu untuk memanfaatkan Docker cache
+COPY composer.json composer.lock ./
 
 # Install dependensi PHP (tanpa dev dependencies)
-RUN composer install --no-dev --optimize-autoloader
+RUN composer install --no-dev --optimize-autoloader --no-interaction
 
-# Generate key aplikasi Laravel
-RUN php artisan key:generate --force
+# Salin semua file dari proyek ke dalam container
+COPY . .
+
+# --- BAGIAN KRUSIAL UNTUK MEMPERBAIKI IZIN ---
+# Berikan kepemilikan folder ke user www-data
+RUN chown -R www-data:www-data /var/www/html
+
+# Berikan izin write ke folder storage dan cache
+RUN chmod -R 775 /var/www/html/storage \
+    && chmod -R 775 /var/www/html/bootstrap/cache
+
+# Pindah ke user www-data untuk menjalankan aplikasi
+USER www-data
+
+# --- BARIS INI SUDAH DIHAPUS ---
+# RUN php artisan key:generate --force
 
 # Expose port 8000 (port yang akan digunakan Railway)
 EXPOSE 8000
